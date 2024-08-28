@@ -1,10 +1,9 @@
-
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use std::num::Wrapping;
-
+/* What even is this? */
 fn penguinrandom(seed: u64) -> u64 {
     let mut t:u64 = 0;
-    let s:u64 = seed / 100;
+    let s:u64 = seed /100;
     if (seed ^ 23) % 2 == 0 {
         t ^= s >> (13 ^ t);
         t ^= 448;
@@ -15,9 +14,11 @@ fn penguinrandom(seed: u64) -> u64 {
         t ^= s >> 3;
     }
     (t.wrapping_mul(s).wrapping_div(11)) % (seed.wrapping_mul(19)) + (seed % 3) + (seed % 7) + (seed % 5) +
-        (seed % 13) + (seed % 17)
+        (seed % 13) + (seed % 17) + (seed % 29) + (seed % 31) + (seed % 37) + (seed % 43) + (seed % 47)
 }
-
+////////////////////////////////
+/// BEGINNING OF EXAMPLE IMPLEMENTATIONS OF penguinrandom.
+////////////////////////////////
 fn u32_prng(seed: u32) -> u32 {
     let mut result = 0;
     for _ in 0..32 {
@@ -44,6 +45,20 @@ fn u64_dprng(seed: u64) -> u64 {
     }
     result
 }
+fn f_prng(seed: u64) -> f64 {
+    let mut result = 0.;
+    let mut new_seed = penguinrandom(seed);
+    for _ in 0..53{
+        new_seed = penguinrandom(new_seed);
+        result = result * 2. + (new_seed%2) as f64;
+    }
+    return 1./result as f64;
+} 
+////////////////////////////////
+/// END OF EXAMPLE IMPLEMENTATIONS OF penguinrandom.
+////////////////////////////////
+
+/* Helper functions we will use to categorize penguinrandom */
 fn sort<A, T>(mut array: A) -> A
 where
     A: AsMut<[T]>,
@@ -59,18 +74,18 @@ fn main() {
     let mut v = [0; 10];
     let mut b = [0; 2];
     let mut d = [0; 6];
-
+    let B: u32 = 10000000;
     println!("A new random function?");
     println!("Better categorize it.");
     println!("1. Fairness (Distribution evenness)");
-    println!("Running on 2**31-1 numbers.");
-
+    println!("Running on {} numbers.", B);
     let mut new_seed:u64 = penguinrandom(seed) ;
-    //let B: u32 = 2147483647;
-    const B:u32 = 1000001;
+    
+    //const B:u32 = 1000001;
     let mut e = vec![];
-    for i in 0..B {
+    for i in (0..B)/* .progress_count(B as u64)*/ {
         new_seed = penguinrandom(new_seed);
+        //print!("{}",new_seed%10);
         v[(new_seed % 10) as usize] += 1;
         b[(new_seed % 2) as usize] += 1;
         d[(new_seed % 6) as usize] += 1;
@@ -129,9 +144,9 @@ fn main() {
     println!("Dots counted inside the quater-circle: {}", inside);
     let pi_estimate:f64 = (inside as f64)/ (interval/2).pow(2) as f64;
     println!("Estimated value of pi: {}",pi_estimate);
-    println!("3. Runs Test, using generated values from Test 1 mod 100.");
+    println!("3. Runs Test, using generated values from Test 1 mod 1000.");
     let e_sort = sort(e.clone());
-    let median = (e_sort[(B/2) as usize] as f64 + e_sort[((B+1)/2) as usize] as f64)/2.;
+    let median:f64 = (e_sort[(B/2) as usize] as f64 + e_sort[((B+1)/2) as usize] as f64)/2.;
 
     let mut runs:u64 = 0;
     let mut i:usize = 0;
@@ -139,37 +154,64 @@ fn main() {
     let mut Nminus:u64 = 0;
     println!("Calculated median: {}", median);
 
-    while i<(e.len()-1){
+    let pb = ProgressBar::new(B.into());
+    let mut past_type = false;
+    for i in 0..e.len()-1{
+        if (e[i] as f64) < median  {
+            Nminus += 1;
+            if past_type{
+                past_type = false;
+                runs += 1;
+                //println!("Broken by {}", e[i]);
+            }
+        }
+        if (e[i] as f64) > median  {
+            Nplus += 1;
+          
+            if !past_type{
+                past_type = true;
+                runs += 1;
+                //println!("Broken by {}", e[i]);
+            }
+        }
         
-            if (e[i] as f64) > median { while ((e[i] as f64) > median) && i<(e.len()-1){
-                i+=1;
-                Nplus += 1;
-            }
-            runs+=1;
-        }
-
-            if (e[i] as f64) < median {while ((e[i] as f64) < median) && i<(e.len()-1){
-                i+=1;
-                Nminus += 1;
-            }
-            runs+=1;
-        }
-            
-            if (e[i] as f64) == median {while ((e[i] as f64) == median) && i<(e.len()-1){
-                i+=1;
-            }
-            //runs+=1;
-        }
     }
+    runs = runs - if e[0] as f64 > median { 1 } else { 0 };
     let mu = 2.*Nplus as f64*Nminus as f64 / e.len() as f64 + 1.0;
     let var = (mu-1.)*(mu-2.)/(e.len() as f64-1.);
     let e_runs = 2*Nplus*Nminus/e.len() as u64 + 1;
+
+    let z1 = ((runs as f64 - mu as f64) / var.sqrt()).abs();
+    let t = z1;
+    let p1 = f64::powf((1.0+t*(0.049867347 + t*(0.0211410061 
+        + t*(0.0032776263 + t*(0.0000380036 + t*(0.0000488906 
+        + t*(0.000005383))))))), -16.0);
+    let p = (1.-p1/2.);
+    let t = 1.-p;
+    /*var EM = 1 + (2*Nplus*Nminus)/(Nplus+Nminus);           //Mean "Mu"
+        var ;
+        var SD2 = Math.pow( (Nplus + Nminus), 2);
+        var SD3 = Nplus + Nminus - 1;
+        var SD4 = SD1 / (SD2 * SD3);           //Standard deviation "Sigma"
+        var SD = Math.sqrt(SD4); 
+	//calculating P value MStyle
+        var z1 = (R - EM)/SD; 
+		var z2 = Math.abs(z1);
+		var z = z2;
+
+        var  t = (z > 0) ? z : (-z);
+        var P1 = Math.pow((1+t*(0.049867347 + t*(0.0211410061 
+                         + t*(0.0032776263 + t*(0.0000380036 + t*(0.0000488906 
+                         + t*(0.000005383))))))), -16);
+        var  p = 1 - P1 / 2;    
+        var t = 1-((z > 0) ? p : 1-p); */
     println!("Estimated mu: {}", mu);
-    println!("Estimated var: {}", var);
+    println!("Estimated var (sigma squared): {}", var);
     println!("Number of +ve values: {}", Nplus);
     println!("Number of -ve values: {}", Nminus);
     println!("Number of expected runs: {}",e_runs);
     println!("Number of runs: {}", runs);
+    println!("P-value: {}",t);
     println!("4. Craps Games");
     println!("Simulating 200,000 games");
     const games:u32 = 200000;
