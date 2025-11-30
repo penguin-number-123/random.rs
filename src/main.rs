@@ -1,20 +1,25 @@
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use std::num::Wrapping;
+use std::fs;
+use std::io;
+use std::io::Write;
+use std::fs::File;
+use std::error::Error;
 /* What even is this? */
 fn penguinrandom(seed: u64) -> u64 {
     let mut t:u64 = 0;
     let s:u64 = seed /100;
     if (seed ^ 23) % 2 == 0 {
         t ^= s >> (13 ^ t);
-        t ^= 448;
+        t ^= 447;
         t ^= s << 1;
     } else {
         t ^= s << (11 ^ t);
         t ^= 127;
         t ^= s >> 3;
     }
-    (t.wrapping_mul(s).wrapping_div(11)) % (seed.wrapping_mul(19)) + (seed % 3) + (seed % 7) + (seed % 5) +
-        (seed % 13) + (seed % 17) + (seed % 29) + (seed % 31) + (seed % 37) + (seed % 43) + (seed % 47)
+    (t.wrapping_mul(s).wrapping_div(11)) % (seed.wrapping_mul(19)) + (seed % 3)  + (seed % 5) +
+        (seed % 13) + (seed % 29) + (seed % 37) + (seed % 43) + (seed % 47) + (seed % 2)
 }
 ////////////////////////////////
 /// BEGINNING OF EXAMPLE IMPLEMENTATIONS OF penguinrandom.
@@ -69,8 +74,8 @@ where
 
     array
 }
-fn main() {
-    let seed = 1724397362; // Replace with your desired seed value
+fn main()-> Result<(), Box<dyn Error>> {
+    let seed = 17243924162; // Replace with your desired seed value
     let mut v = [0; 10];
     let mut b = [0; 2];
     let mut d = [0; 6];
@@ -224,4 +229,15 @@ fn main() {
         let mut dice2 = penguinrandom(dice1)%6;
 
     }
+    let mut bins = "".to_string();
+    for i in (0..1000000)/* .progress_count(B as u64)*/ {
+        new_seed = penguinrandom(new_seed);
+        bins = bins + &(new_seed%2).to_string();
+       
+    }
+    let mut file = File::options()
+        .append(true).open("random.txt")?;
+        
+        write!(&mut file, "{bins}")?;
+    Ok(())
 }
